@@ -134,7 +134,7 @@ class Redshift():
                 elif instance.Type in ["3d"]:
                     mc.setAttr(rs_disp+".scale", 10)
                     
-            # high res cases
+            # high res case
             else:
                 if instance.Type in ["surface"] or instance.Type in ["3dplant"]:
                     displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
@@ -377,7 +377,7 @@ class Vray():
 
                 mc.defaultNavigation(connectToExisting=True, source=normal_, destination=mtl_node + ".bumpMap")
                 mc.setAttr(mtl_node + ".bumpMapType", 1)
-                mc.setAttr(mtl_node + ".bumpMult", 0)
+                mc.setAttr(mtl_node + ".bumpMult", 1)
                 mc.setAttr(mtl_node + ".refractionIOR", 1.52)
 
 
