@@ -36,6 +36,7 @@ class importerSetup():
 # set the exported asset data by using Json provided with the asset
     def set_Asset_Data(self, json_data):
         self.setRenderEngine()
+        
         if(self.Renderer == "Not-Supported"):
             msg = 'Your current render engine (' + self.Renderer + ') is not supported by the Bridge Plugin so we are terminating the import process but the Plugin is still running!'
             mc.confirmDialog( title='MS Plugin Error', message=msg, button=['Ok'], defaultButton='Ok', cancelButton='Ok', dismissString='Ok')
@@ -43,6 +44,9 @@ class importerSetup():
             return
         else:
             print("Your current render engine is " + self.Renderer)
+        
+        #print("Your current render engine is " + self.Renderer)
+
         self.json_data = json_data
         self.TexturesList = []
         self.Type = self.json_data["type"]
@@ -126,6 +130,10 @@ class importerSetup():
             Renderers.Arnold()
             #Hypershade.RearrangeHyperShade()
             #Hypershade.CloseHyperShader()
+        elif self.Renderer == "OctaneRender" and "octaneplugin" in plugins_:
+            Renderers.OctaneRender()
+            #Hypershade.RearrangeHyperShade()
+            #Hypershade.CloseHyperShader()
         elif self.Renderer == "MayaSoftware":
             Renderers.Arnold()
         else:
@@ -177,6 +185,8 @@ class importerSetup():
             self.Renderer = "Vray"
         elif("arnold" in selectedRenderer):
             self.Renderer = "Arnold"
+        elif("octanerender" in selectedRenderer):
+            self.Renderer = "OctaneRender"
         elif("mayasoftware" in selectedRenderer):
             self.Renderer = "MayaSoftware"
             

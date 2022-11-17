@@ -1,6 +1,6 @@
 """
 This Module:
-- Handles the material setup for each renderer (Redshift, Vray, Arnold)
+- Handles the material setup for each renderer (Redshift, Vray, Arnold, Octane)
 """
 import maya.cmds as mc
 import maya.mel as melc
@@ -995,6 +995,315 @@ class Arnold():
                     
             mc.setAttr(arn_mat+".transmission", 0.85)
 
+            #print(used_maps)
+        else:
+            print("Please make sure you have the latest version of Arnold installed. Go to SolidAngle.com to get it.")
+
+#########################################################################################
+#########################################################################################
+#########################################################################################
+#########################################################################################
+#########################################################################################
+#########################################################################################
+# This section is written by Denes Dankhazi
+
+"""OctaneRender Studio 2021.1.6 - 20.23 Material Creation."""
+
+class OctaneRender():
+    def __init__(self):
+        self.shaderList = instance.defaultShaderList
+        self.ShaderName = ""
+        if instance.isMultiMat:
+            for index,shader in enumerate(self.shaderList):
+                if instance.MultiMaterial[index].lower() == 'glass':
+                    self.GlassSetup(shader)
+                else:
+                    self.OpaqueSetup(shader)
+        else:
+            self.OpaqueSetup(None)
+        
+            
+    def OpaqueSetup(self, shader):        
+        nodes_ = mc.allNodeTypes()
+        # print(nodes_)
+        
+        #Standard Surface is not available in 2019 and 2018
+        #if "standardSurface" in nodes_:
+        #    self.ShaderName = "standardSurface"
+        # else:
+        self.ShaderName = "octaneUniversalMaterial"
+        
+        if len(instance.tex_nodes) >= 1 and self.ShaderName in nodes_:
+
+            # Set the material and shading group
+
+            oct_mat = mc.shadingNode(self.ShaderName, asShader=True, name=(instance.Name + "_Mat"))
+            mc.setAttr(oct_mat+".BsdfModel", 6)
+            
+            octUVTransform_ = mc.shadingNode('octaneTransform2D', asTexture=True, name= 'UVTransform')
+            uvCoord_ = instance.coord_2d
+            mc.connectAttr((uvCoord_+".rotateUV"), (octUVTransform_+".RotationX"))
+            mc.connectAttr((uvCoord_+".offsetU"), (octUVTransform_+".TranslationX"))
+            mc.connectAttr((uvCoord_+".offsetV"), (octUVTransform_+".TranslationY"))
+
+
+            octUVScaleConv_ = mc.shadingNode('multiplyDivide', asTexture=True, name= 'UVScaleConverter')
+            mc.setAttr(octUVScaleConv_+".input1X", 1)
+            mc.setAttr(octUVScaleConv_+".input1Y", 1)
+            mc.setAttr(octUVScaleConv_+".operation", 2)
+            mc.connectAttr((uvCoord_+".repeatU"), (octUVScaleConv_+".input2X"))
+            mc.connectAttr((uvCoord_+".repeatV"), (octUVScaleConv_+".input2Y"))
+
+            mc.connectAttr((octUVScaleConv_+".outputX"), (octUVTransform_+".ScaleX"))
+            mc.connectAttr((octUVScaleConv_+".outputY"), (octUVTransform_+".ScaleY"))
+            
+
+            if not shader == None:
+                arn_sg = shader
+            else:
+                arn_sg = mc.sets(r=True, nss=True, name=(instance.Name + "_SG"))
+            mc.defaultNavigation(connectToExisting=True, source=oct_mat, destination=arn_sg)
+
+            maps_ = [item[1] for item in instance.tex_nodes]
+            used_maps = []
+
+            # print(maps_)
+
+
+            
+            if "normal" in maps_:
+                #arn_normal = mc.shadingNode('aiNormalMap', asShader=True, name=(instance.ID + "_Normal"))
+                normal_ = [item[0] for item in instance.tex_nodes if item[1] == "normal"][0]
+                
+                octNormal_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'normalMap')
+                mc.connectAttr((normal_+".fileTextureName"), (octNormal_+".File"))
+                mc.setAttr(octNormal_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octNormal_+".Transform"))
+                
+                mc.connectAttr((octNormal_+".outTex"), (oct_mat+".Normal"))
+
+                used_maps.append(normal_)
+
+
+            if "albedo" in maps_:
+                albedo_ = [item[0] for item in instance.tex_nodes if item[1] == "albedo"][0]
+                
+                octAlbedo_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'albedoMap')
+                mc.connectAttr((albedo_+".fileTextureName"), (octAlbedo_+".File"))
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octAlbedo_+".Transform"))
+
+                mc.connectAttr((octAlbedo_+".outTex"), (oct_mat+".Albedo"))
+
+                used_maps.append(albedo_)
+
+            # Create the specular setup
+            '''
+            if "specular" in maps_:
+                specular_ = [item[0] for item in instance.tex_nodes if item[1] == "specular"][0]
+                mc.connectAttr((specular_+".outColor"), (oct_mat+".specularColor"))
+                mc.setAttr(oct_mat + ".specular",0.5)
+            '''
+            
+            if "roughness" in maps_:
+                #arn_rough_range = mc.shadingNode('aiRange', asShader=True, name=(instance.ID + "_Rough_Range"))
+                roughness_ = [item[0] for item in instance.tex_nodes if item[1] == "roughness"][0]
+                
+                octRoughness_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'roughnessMap')
+                mc.connectAttr((roughness_+".fileTextureName"), (octRoughness_+".File"))
+                mc.setAttr(octRoughness_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octRoughness_+".Transform"))
+
+                mc.connectAttr((octRoughness_+".outTex"), (oct_mat+".Roughness"))
+
+                used_maps.append(roughness_)
+            '''
+            elif "gloss" in maps_:
+                arn_rough_range = mc.shadingNode('aiRange', asShader=True, name=(instance.ID + "_Rough_Range"))
+                reverse_ = mc.shadingNode('reverse', asShader=True, name= 'invert')
+                gloss_ = [item[0] for item in instance.tex_nodes if item[1] == "gloss"][0]
+                mc.connectAttr((gloss_+".outColor"), (reverse_+".input"))
+                mc.connectAttr((reverse_+".output"), (arn_rough_range+".input"))
+                mc.connectAttr((arn_rough_range+".outColor.outColorR"), (oct_mat+".specularRoughness"))
+                mc.setAttr(gloss_+".alphaIsLuminance", 1)
+
+                used_maps.append(gloss_)
+            '''
+
+            if "displacement" in maps_ and not instance.isHighPoly:
+                arn_disp_shr = mc.shadingNode('octaneVertexDisplacementNode', asTexture=True, name=(instance.ID + "_Displacement_shr"))
+                mc.setAttr(arn_disp_shr+".MidLevel", 0.5)
+                mc.setAttr(arn_disp_shr+".SubdLevel", 3)
+                mc.setAttr(arn_disp_shr+".AutoBumpMap", 1)
+                mc.setAttr(arn_disp_shr+".Height", 10)
+
+                
+                displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
+                octDisplacement_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'displaceMap')
+
+                mc.connectAttr((displacement_+".fileTextureName"), (octDisplacement_+".File"))
+                mc.connectAttr((octDisplacement_+".outTex"), (arn_disp_shr+".Texture"))
+                mc.setAttr(octDisplacement_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octDisplacement_+".Transform"))
+
+                mc.connectAttr((arn_disp_shr+".outDisp"), (oct_mat+".Displacement"))
+
+                '''
+                displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
+                mc.connectAttr((displacement_+".outColor"), (arn_sg+".displacementShader"))
+                mc.setAttr(displacement_+".alphaIsLuminance", 1)
+                '''
+                print ('Low Res Geo')
+
+                if instance.Type in ["3dplant"]:
+                    mc.delete(arn_disp_shr)
+                    
+
+                used_maps.append(displacement_)
+            else:
+                if instance.Type in ["surface"]:
+                    arn_disp_shr = mc.shadingNode('octaneVertexDisplacementNode', asTexture=True, name=(instance.ID + "_Displacement_shr"))
+                    mc.setAttr(arn_disp_shr+".MidLevel", 0.5)
+                    mc.setAttr(arn_disp_shr+".SubdLevel", 3)
+                    mc.setAttr(arn_disp_shr+".AutoBumpMap", 1)
+                    mc.setAttr(arn_disp_shr+".Height", 10)
+                    
+                    displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
+                    octDisplacement_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'displaceMap')
+
+                    mc.connectAttr((displacement_+".fileTextureName"), (octDisplacement_+".File"))
+                    mc.connectAttr((octDisplacement_+".outTex"), (arn_disp_shr+".Texture"))
+                    mc.setAttr(octDisplacement_+".Gamma", 1)
+
+                    mc.connectAttr((octUVTransform_+".outTransform"), (octDisplacement_+".Transform"))
+
+                    mc.connectAttr((arn_disp_shr+".outDisp"), (oct_mat+".Displacement"))
+                else:    
+                    print ('High Res Geo')
+
+
+            if "metalness" in maps_:
+                metalness_ = [item[0] for item in instance.tex_nodes if item[1] == "metalness"][0]
+                
+                octMetalness_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'metalnessMap')
+                mc.connectAttr((metalness_+".fileTextureName"), (octMetalness_+".File"))
+                mc.setAttr(octMetalness_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octMetalness_+".Transform"))
+
+                mc.connectAttr((octMetalness_+".outTex"), (oct_mat+".Metallic"))
+
+                used_maps.append(metalness_)
+
+
+            if "translucency" in maps_:
+                translucency_ = [item[0] for item in instance.tex_nodes if item[1] == "translucency"][0]
+                
+                mc.setAttr(oct_mat+".TransmissionType", 3)
+
+                octTanslucency_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'translucencyMap')
+                mc.connectAttr((translucency_+".fileTextureName"), (octTanslucency_+".File"))
+                mc.setAttr(octTanslucency_+".Gamma", 2.2)
+
+                octTranslucencyPower_ = mc.shadingNode('octaneFloatTexture', asTexture=True, name= 'translPower')
+                mc.setAttr(octTranslucencyPower_+".Value", 0.05)
+                
+                mc.connectAttr((octTranslucencyPower_+".outTex"), (octTanslucency_+".Power"))
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octTanslucency_+".Transform"))
+
+                mc.connectAttr((octTanslucency_+".outTex"), (oct_mat+".Transmission"))
+
+                used_maps.append(translucency_)
+
+            '''
+            elif "transmission" in maps_:
+                transmission_ = [item[0] for item in instance.tex_nodes if item[1] == "transmission"][0]
+                
+                octTransmission_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'transmissionMap')
+                mc.connectAttr((transmission_+".fileTextureName"), (octTransmission_+".File"))
+                mc.setAttr(octTransmission_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octTransmission_+".Transform"))
+
+                mc.connectAttr((octOpacity_+".outTex"), (oct_mat+".Opacity"))
+
+                used_maps.append(transmission_)
+            '''
+            
+                
+            
+            if "opacity" in maps_:
+                opacity_ = [item[0] for item in instance.tex_nodes if item[1] == "opacity"][0]
+                
+                octOpacity_ = mc.shadingNode('octaneImageTexture', asTexture=True, name= 'opacityMap')
+                mc.connectAttr((opacity_+".fileTextureName"), (octOpacity_+".File"))
+                mc.setAttr(octOpacity_+".Gamma", 1)
+
+                mc.connectAttr((octUVTransform_+".outTransform"), (octOpacity_+".Transform"))
+
+                mc.connectAttr((octOpacity_+".outTex"), (oct_mat+".Opacity"))
+
+                used_maps.append(opacity_)
+            
+
+            if len(instance.mesh_transforms) >= 1:
+                for mesh_ in instance.mesh_transforms:
+                    
+                    mc.setAttr(mesh_+".smoothLevel", 1)
+                    print(mesh_)
+
+                    '''
+                    if "displacement" in maps_:
+                        if not instance.isHighPoly:
+                            
+                            mc.setAttr(mesh_+".aiSubdivType", keyable=True)
+                            mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
+                            mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
+                            mc.setAttr(mesh_+".aiSubdivType", 1)
+                            if instance.Type in ["3d"]:
+                                mc.setAttr(mesh_+".aiSubdivIterations", 3)
+                                mc.setAttr(mesh_+".aiDispHeight", 1)
+                                mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
+                                mc.setAttr(mesh_+".aiDispPadding", 1.0)
+                                mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
+                                mc.setAttr(mesh_+".renderSmoothLevel", 0)
+                            elif instance.Type in ["3dplant"]:
+                                mc.setAttr(mesh_+".aiSubdivType", 0)
+                                mc.setAttr(mesh_+".aiSubdivIterations", 0)
+                                mc.setAttr(mesh_+".aiDispHeight", 1)
+                                mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
+                                mc.setAttr(mesh_+".aiDispPadding", 1.0)
+                                mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
+                                mc.setAttr(mesh_+".renderSmoothLevel", 0)
+                                mc.setAttr(arn_normal+".strength", 1)
+                                #mc.setAttr(arn_disp_shr + ".scale", 0)
+                            else:
+                                mc.setAttr(mesh_+".aiDispHeight", 1)
+                                mc.setAttr(mesh_+".aiDispZeroValue", 0)
+                                mc.setAttr(mesh_+".aiDispPadding", 0.0)
+                        
+                        if instance.Type in ["surface"]:
+                                mc.setAttr(mesh_+".aiSubdivType", keyable=True)
+                                mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
+                                mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
+                                mc.setAttr(mesh_+".aiSubdivType", 1)
+                                mc.setAttr(mesh_+".aiSubdivIterations", 3)
+                    '''
+
+                    '''
+                    if "opacity" in maps_:
+                        #mc.setAttr(mesh_+".aiOpaque", 0)
+
+                    if "normal" not in maps_ and not instance.isHighPoly:
+                        #mc.setAttr(mesh_+".aiDispAutobump", 1)
+                    '''
+                    mc.select(mesh_)
+                    melc.eval('sets -e -forceElement '+arn_sg)
+                    
             #print(used_maps)
         else:
             print("Please make sure you have the latest version of Arnold installed. Go to SolidAngle.com to get it.")
