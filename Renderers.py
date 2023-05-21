@@ -815,14 +815,26 @@ class Arnold():
                 arn_disp_shr = mc.shadingNode('displacementShader', asTexture=True, name=(instance.ID + "_Displacement_shr"))
                 
                 displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
-                mc.connectAttr((displacement_+".outAlpha"), (arn_disp_shr+".displacement"))
+
+                math_offset = mc.shadingNode('floatMath', asUtility=True, name=(instance.ID + "_displaceOffset"))
+                math_multiply = mc.shadingNode('floatMath', asUtility=True, name=(instance.ID + "_displaceMultiply"))
+               
+                mc.setAttr(math_offset+".floatB", -0.5)
+                mc.setAttr(math_multiply+".operation", 2)
+               
+                mc.connectAttr((displacement_+".outColor.outColorR"), (math_offset+".floatA"))
+                mc.connectAttr((math_offset+".outFloat"), (math_multiply+".floatA"))
+ 
+                mc.connectAttr((math_multiply+".outFloat"), (arn_disp_shr+".displacement"))
+
+                #mc.connectAttr((displacement_+".outAlpha"), (arn_disp_shr+".displacement"))
                 mc.connectAttr((arn_disp_shr+".displacement"), (arn_sg+".displacementShader"))
                 mc.setAttr(arn_disp_shr + ".aiDisplacementAutoBump", 0)
                 mc.setAttr(arn_disp_shr + ".aiDisplacementZeroValue", 0)
                 mc.setAttr(arn_disp_shr + ".aiDisplacementPadding", 10.0)
                 mc.setAttr(arn_disp_shr + ".scale", 10)
                 mc.setAttr(displacement_+".alphaIsLuminance", 1)
-                mc.setAttr(displacement_+".alphaOffset", -0.5)
+                #mc.setAttr(displacement_+".alphaOffset", -0.5)
 
                 '''
                 displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
@@ -841,14 +853,26 @@ class Arnold():
                     arn_disp_shr = mc.shadingNode('displacementShader', asTexture=True, name=(instance.ID + "_Displacement_shr"))
                 
                     displacement_ = [item[0] for item in instance.tex_nodes if item[1] == "displacement"][0]
-                    mc.connectAttr((displacement_+".outAlpha"), (arn_disp_shr+".displacement"))
+
+                    math_offset = mc.shadingNode('floatMath', asUtility=True, name=(instance.ID + "_displaceOffset"))
+                    math_multiply = mc.shadingNode('floatMath', asUtility=True, name=(instance.ID + "_displaceMultiply"))
+                
+                    mc.setAttr(math_offset+".floatB", -0.5)
+                    mc.setAttr(math_multiply+".operation", 2)
+                
+                    mc.connectAttr((displacement_+".outColor.outColorR"), (math_offset+".floatA"))
+                    mc.connectAttr((math_offset+".outFloat"), (math_multiply+".floatA"))
+    
+                    mc.connectAttr((math_multiply+".outFloat"), (arn_disp_shr+".displacement"))
+
+                    #mc.connectAttr((displacement_+".outAlpha"), (arn_disp_shr+".displacement"))
                     mc.connectAttr((arn_disp_shr+".displacement"), (arn_sg+".displacementShader"))
                     mc.setAttr(arn_disp_shr + ".aiDisplacementAutoBump", 0)
                     mc.setAttr(arn_disp_shr + ".aiDisplacementZeroValue", 0)
                     mc.setAttr(arn_disp_shr + ".aiDisplacementPadding", 10.0)
                     mc.setAttr(arn_disp_shr + ".scale", 10)
                     mc.setAttr(displacement_+".alphaIsLuminance", 1)
-                    mc.setAttr(displacement_+".alphaOffset", -0.5)
+                    #mc.setAttr(displacement_+".alphaOffset", -0.5)
                 else:    
                     print ('High Res Geo')
 
@@ -874,6 +898,7 @@ class Arnold():
             elif "transmission" in maps_:
                 transmission_ = [item[0] for item in instance.tex_nodes if item[1] == "transmission"][0]
                 mc.connectAttr((transmission_+".outColor.outColorR"), (arn_mat+".transmission"))
+                mc.setAttr(transmission_+".colorGain", 0.25, 0.25, 0.25, type="double3")
 
                 used_maps.append(transmission_)
                 
@@ -889,52 +914,62 @@ class Arnold():
             if len(instance.mesh_transforms) >= 1:
                 for mesh_ in instance.mesh_transforms:
                     
-                    mc.setAttr(mesh_+".smoothLevel", 1)
-                    print(mesh_)
+                    node_type = mc.nodeType(mesh_)
+                    if node_type in ('mesh'):
+                        mc.setAttr(mesh_+".smoothLevel", 1)
+                        print(mesh_)
 
-                    if "displacement" in maps_:
-                        if not instance.isHighPoly:
-                            mc.setAttr(mesh_+".aiSubdivType", keyable=True)
-                            mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
-                            mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
-                            mc.setAttr(mesh_+".aiSubdivType", 1)
-                            if instance.Type in ["3d"]:
-                                mc.setAttr(mesh_+".aiSubdivIterations", 3)
-                                mc.setAttr(mesh_+".aiDispHeight", 1)
-                                mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
-                                mc.setAttr(mesh_+".aiDispPadding", 1.0)
-                                mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
-                                mc.setAttr(mesh_+".renderSmoothLevel", 0)
-                            elif instance.Type in ["3dplant"]:
-                                mc.setAttr(mesh_+".aiSubdivType", 0)
-                                mc.setAttr(mesh_+".aiSubdivIterations", 0)
-                                mc.setAttr(mesh_+".aiDispHeight", 1)
-                                mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
-                                mc.setAttr(mesh_+".aiDispPadding", 1.0)
-                                mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
-                                mc.setAttr(mesh_+".renderSmoothLevel", 0)
-                                mc.setAttr(arn_normal+".strength", 1)
-                                #mc.setAttr(arn_disp_shr + ".scale", 0)
-                            else:
-                                mc.setAttr(mesh_+".aiDispHeight", 1)
-                                mc.setAttr(mesh_+".aiDispZeroValue", 0)
-                                mc.setAttr(mesh_+".aiDispPadding", 0.0)
-                        
-                        if instance.Type in ["surface"]:
-                                mc.setAttr(mesh_+".aiSubdivType", keyable=True)
-                                mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
-                                mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
-                                mc.setAttr(mesh_+".aiSubdivType", 1)
-                                mc.setAttr(mesh_+".aiSubdivIterations", 3)
+                    else:
+                        Specmesh_ = mc.listRelatives(mesh_, children=True)
 
-                    if "opacity" in maps_:
-                        mc.setAttr(mesh_+".aiOpaque", 0)
+                        for tempMesh_ in Specmesh_:
+                            mesh_ = tempMesh_
+                            mc.setAttr(mesh_+".smoothLevel", 1)
+                            print(mesh_)
 
-                    if "normal" not in maps_ and not instance.isHighPoly:
-                        mc.setAttr(mesh_+".aiDispAutobump", 1)
-                    
-                    mc.select(mesh_)
-                    melc.eval('sets -e -forceElement '+arn_sg)
+                            if "displacement" in maps_:
+                                if not instance.isHighPoly:
+                                    mc.setAttr(mesh_+".aiSubdivType", keyable=True)
+                                    mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
+                                    mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
+                                    mc.setAttr(mesh_+".aiSubdivType", 1)
+                                    if instance.Type in ["3d"]:
+                                        mc.setAttr(mesh_+".aiSubdivIterations", 3)
+                                        mc.setAttr(mesh_+".aiDispHeight", 1)
+                                        mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
+                                        mc.setAttr(mesh_+".aiDispPadding", 1.0)
+                                        mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
+                                        mc.setAttr(mesh_+".renderSmoothLevel", 0)
+                                    elif instance.Type in ["3dplant"]:
+                                        mc.setAttr(mesh_+".aiSubdivType", 0)
+                                        mc.setAttr(mesh_+".aiSubdivIterations", 0)
+                                        mc.setAttr(mesh_+".aiDispHeight", 1)
+                                        mc.setAttr(mesh_+".aiDispZeroValue", 0.0)
+                                        mc.setAttr(mesh_+".aiDispPadding", 1.0)
+                                        mc.setAttr(mesh_+".useSmoothPreviewForRender", 0)
+                                        mc.setAttr(mesh_+".renderSmoothLevel", 0)
+                                        mc.setAttr(arn_normal+".strength", 1)
+                                        #mc.setAttr(arn_disp_shr + ".scale", 0)
+                                    else:
+                                        mc.setAttr(mesh_+".aiDispHeight", 1)
+                                        mc.setAttr(mesh_+".aiDispZeroValue", 0)
+                                        mc.setAttr(mesh_+".aiDispPadding", 0.0)
+                                
+                                if instance.Type in ["surface"]:
+                                        mc.setAttr(mesh_+".aiSubdivType", keyable=True)
+                                        mc.setAttr(mesh_+".aiSubdivIterations", keyable=True)
+                                        mc.setAttr(mesh_+".aiDispAutobump", keyable=True)
+                                        mc.setAttr(mesh_+".aiSubdivType", 1)
+                                        mc.setAttr(mesh_+".aiSubdivIterations", 3)
+
+                            if "opacity" in maps_:
+                                mc.setAttr(mesh_+".aiOpaque", 0)
+
+                            if "normal" not in maps_ and not instance.isHighPoly:
+                                mc.setAttr(mesh_+".aiDispAutobump", 1)
+                            
+                            mc.select(mesh_)
+                            melc.eval('sets -e -forceElement '+arn_sg)
                     
             #print(used_maps)
         else:
